@@ -28,11 +28,16 @@ typedef struct Lexer{
 	Dfa *dfa_ptr;
 	int *dfa_states;
 	int dfa_len_states;
-	int symbol_counter_complete;
+
+	int symbol_counter_tokenized;
 		// Global index of symbol upto which tokenization is complete
+	int symbol_counter_read;
+		// Global index of symbol upto which reading is complete
 
 	// Buffer
 
+	FILE *file_ptr;
+	int buffer_size;
 	LinkedList *buffer_list;
 
 
@@ -49,9 +54,21 @@ typedef struct Lexer{
 /////////////////////////////////
 
 static Buffer *Buffer_new(int size);
+
 static void Buffer_destroy(Buffer *bfr_ptr);
+
 static int hash_function(void *key);
+
 static int key_compare(void *key1, void *key2);
+
+// Adds buffers to buffer_list if character at index does not exist yet. Frees
+// unneeded buffers from buffer_list.
+// Returns 0 on success. -1 on failure
+static int buffer_list_update(Lexer *lxr_ptr, int index);
+
+// Reads required number of characters from input and adds one buffer to
+// buffer_list
+static int buffer_list_add(Lexer *lxr_ptr);
 
 
 ////////////////////////////////
@@ -62,9 +79,13 @@ Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size){
 	Lexer *lxr_ptr = malloc( sizeof(Lexer) );
 
 	lxr_ptr->dfa_ptr = dfa_ptr;
-	lxr_ptr->symbol_counter_complete = 0;
 	Dfa_get_state_lists(dfa_ptr, &lxr_ptr->dfa_states, &lxr_ptr->dfa_len_states, NULL, NULL, NULL);
 
+	lxr_ptr->symbol_counter_tokenized = 0;
+	lxr_ptr->symbol_counter_read = 0;
+
+	lxr_ptr->file_ptr = file_ptr;
+	lxr_ptr->buffer_size = buffer_size;
 	lxr_ptr->buffer_list = LinkedList_new();
 
 	lxr_ptr->evaluator_table = HashTable_new(lxr_ptr->dfa_len_states, hash_function, key_compare);
@@ -115,6 +136,109 @@ void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_func
 
 Token *Lexer_get_next_token(Lexer *lxr_ptr){
 
+}
+
+
+////////////
+// Buffer //
+////////////
+
+static int buffer_list_update(Lexer *lxr_ptr, int index){
+	if(index <= lxr_ptr->symbol_counter_tokenized){
+		// Unrecoverable condition
+		return -1;
+	}
+
+	// Pop unneeded buffers
+	while(1){
+		// Check the last buffer in list
+		Buffer *bfr_ptr = LinkedList_peekback(lxr_ptr->buffer_list);
+
+		if(bfr_ptr == NULL){
+			// No buffers exist in list
+			break;
+		}
+
+		else if(bfr_ptr->global_index_end > lxr_ptr->symbol_counter_tokenized){
+			// Buffer contains untokenized characters
+			break;
+		}
+
+		else{
+			LinkedList_popback(lxr_ptr->buffer_list);
+		}
+	}
+
+	// Add required buffers
+	while(1){
+		// Check the first buffer in list
+		Buffer *bfr_ptr = LinkedList_peek(lxr_ptr->buffer_list);
+
+		if(bfr_ptr == NULL){
+			// No buffers exist in list, add one
+			int status = buffer_list_add(lxr_ptr);
+			if(status == -1){
+				// Error while reading
+				return -1;
+			}
+		}
+
+		else if(bfr_ptr->global_index_end >= index){
+			// Required character in buffer
+			break;
+		}
+
+		else{
+			// Required character not in buffer, add
+			int status = buffer_list_add(lxr_ptr);
+			if(status == -1){
+				// Error while reading
+				return -1;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int buffer_list_add(Lexer *lxr_ptr){
+	Buffer *bfr_ptr = Buffer_new(lxr_ptr->buffer_size);
+
+	bfr_ptr->len_string = fread(bfr_ptr->string, sizeof(char), lxr_ptr->buffer_size, lxr_ptr->file_ptr);
+	bfr_ptr->global_index_start = 1 + lxr_ptr->symbol_counter_read;
+	bfr_ptr->global_index_end = bfr_ptr->global_index_start + bfr_ptr->len_string - 1;
+
+	lxr_ptr->symbol_counter_read += bfr_ptr->len_string;
+
+	LinkedList_push(lxr_ptr->buffer_list, bfr_ptr);
+
+	if(bfr_ptr->len_string < lxr_ptr->buffer_size){
+		// EOF or error
+
+		if( feof(lxr_ptr->file_ptr) ){
+			// EOF
+			// Add a buffer containing only the EOF constant
+			Buffer *bfr_eof_ptr = Buffer_new( sizeof(char) );
+
+			*(bfr_eof_ptr->string) = (char)EOF;	// Casting int to char.
+				// Works as char is signed, and EOF can fit in char.
+			bfr_eof_ptr->len_string = 1;
+			bfr_ptr->global_index_start = 1 + lxr_ptr->symbol_counter_read;
+			bfr_ptr->global_index_end = bfr_ptr->global_index_start;
+
+			lxr_ptr->symbol_counter_read += 1;
+
+			LinkedList_push(lxr_ptr->buffer_list, bfr_eof_ptr);
+		}
+
+		else{
+			// Error
+			fprintf(stderr, "Error reading at position %d\n", lxr_ptr->symbol_counter_read);
+			return -1;
+		}
+	}
+
+	return 0;
 }
 
 
