@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "Lexer.h"
 #include "Dfa.h"
@@ -69,6 +70,10 @@ static int buffer_list_update(Lexer *lxr_ptr, int index);
 // Reads required number of characters from input and adds one buffer to
 // buffer_list
 static int buffer_list_add(Lexer *lxr_ptr);
+
+// Gets a string starting from global index of length len. String is copied
+// into dst. Returns 0 on success, -1 on failure
+static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len);
 
 
 ////////////////////////////////
@@ -283,6 +288,82 @@ static int buffer_list_add(Lexer *lxr_ptr){
 	}
 
 	return 0;
+}
+
+static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len){
+	LinkedListIterator *itr_ptr = LinkedListIterator_new(lxr_ptr->buffer_list);
+	LinkedListIterator_move_to_last(itr_ptr);
+
+	Buffer *bfr_ptr;
+	int char_copied = 0;	// Also index in dst where to copy
+
+	// Iterate until index is in buffer. Then copy
+	while(1){
+		bfr_ptr = LinkedListIterator_get_item(itr_ptr);
+
+		if(bfr_ptr == NULL){
+			// Unrecoverable condition
+			return -1;
+		}
+
+		else if(bfr_ptr->global_index_start > index + char_copied){
+			// Unrecoverable condition
+			return -1;
+		}
+
+		else if(bfr_ptr->global_index_end < index + char_copied){
+			// Move to previous(newer) buffer
+			LinkedListIterator_move_to_previous(itr_ptr);
+		}
+
+		else if(bfr_ptr->global_index_start >= index + char_copied &&
+			bfr_ptr->global_index_end <= index + char_copied)
+		{
+			// Index for copying is within this buffer. Copy
+
+			int num_char_left = len - char_copied;
+				// Number of characters which are left to be copied into dst
+
+			int bfr_index = (index+char_copied) - bfr_ptr->global_index_start;
+				// Index in buffer from which to start copying
+
+			int num_char_available = bfr_ptr->global_index_end - (index+char_copied) + 1;
+				// Number of characters which are available in the buffer from
+				// appropriate index which can be copied
+
+			if(num_char_left <= num_char_available){
+				// More or equal number of characters in buffer than required
+				// to be copied. No need to look into further buffers.
+
+				// Copy all the left characters
+				memcpy(dst + char_copied,
+					bfr_ptr->string + bfr_index,
+					num_char_left);
+
+				// Increase char_copied
+				char_copied += num_char_left;
+
+				// return as no more characters need to be copied
+				return 0;
+			}
+
+			else{
+				// Less characters available to copy than required. Copy and
+				// look into further buffers
+
+				// Copy all available characters
+				memcpy(dst + char_copied,
+					bfr_ptr->string + bfr_index,
+					num_char_available
+					);
+
+				// Increase char_copied
+				char_copied += num_char_available;
+
+				// Continue in the loop, moving to newer buffer
+			}
+		}
+	}
 }
 
 
