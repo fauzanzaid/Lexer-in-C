@@ -136,6 +136,51 @@ void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_func
 
 Token *Lexer_get_next_token(Lexer *lxr_ptr){
 
+	int dfa_run_status = DFA_RUN_RESULT_UNKNOWN;
+	int bfr_update_status;
+
+	while(1){
+		Buffer *bfr_ptr = LinkedList_peek(lxr_ptr->buffer_list);
+
+		if(bfr_ptr != NULL){
+			dfa_run_status = Dfa_run(lxr_ptr->dfa_ptr, bfr_ptr->string, bfr_ptr->len_string, bfr_ptr->global_index_start);
+		}
+
+		if(bfr_ptr == NULL ||
+			dfa_run_status == DFA_RUN_RESULT_MORE_INPUT ||
+			dfa_run_status == DFA_RUN_RESULT_WRONG_INDEX){
+			// Get how many characters have been processed by DFA
+			int dfa_symbol_counter;
+			Dfa_get_current_configuration(lxr_ptr->dfa_ptr, NULL, NULL, &dfa_symbol_counter);
+
+			// Update buffer list to make sure expected character exists in it
+			bfr_update_status = buffer_list_update(lxr_ptr, dfa_symbol_counter + 1);
+			if(bfr_update_status == -1){
+				// Error
+				fprintf(stderr, "Error updating buffers\n");
+				return NULL;
+			}
+		}
+
+		else if(dfa_run_status == DFA_RUN_RESULT_TRAP){
+			int dfa_retract_status;
+			dfa_retract_status = Dfa_retract(lxr_ptr->dfa_ptr);
+
+			int dfa_state;
+			int dfa_symbol_counter;
+			Dfa_get_current_configuration(lxr_ptr->dfa_ptr, &dfa_state, NULL, &dfa_symbol_counter);
+
+			if(dfa_retract_status == DFA_RETRACT_RESULT_FAIL){
+				// Lexical error in input
+			}
+			else if(dfa_retract_status == DFA_RETRACT_RESULT_SUCCESS){
+				// Send string to evaluator
+			}
+
+		}
+
+	}
+
 }
 
 
