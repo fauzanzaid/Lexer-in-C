@@ -5,7 +5,6 @@
 #include "Lexer.h"
 #include "Dfa.h"
 #include "LinkedList.h"
-#include "HashTable.h"
 
 
 /////////////////////
@@ -27,11 +26,13 @@ typedef struct Lexer{
 	// State
 
 	Dfa *dfa_ptr;
-	int *dfa_states;
-	int dfa_len_states;
 
 	int symbol_counter_tokenized;
 		// Global index of symbol upto which tokenization is complete
+	int line_counter_tokenized;
+		// Line number being scanned currently
+	int column_counter_tokenized;
+		// Column number upto which tokenization is complete
 	int symbol_counter_read;
 		// Global index of symbol upto which reading is complete
 
@@ -80,12 +81,13 @@ Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size,
 	void (*success_evaluate_function)(Token *, int, char *, int),
 	void (*error_evaluate_function)(Token *)
 	){
-	Lexer *lxr_ptr = malloc( sizeof(Lexer) );
 
+	Lexer *lxr_ptr = malloc( sizeof(Lexer) );
 	lxr_ptr->dfa_ptr = dfa_ptr;
-	Dfa_get_state_lists(dfa_ptr, &lxr_ptr->dfa_states, &lxr_ptr->dfa_len_states, NULL, NULL, NULL);
 
 	lxr_ptr->symbol_counter_tokenized = 0;
+	lxr_ptr->line_counter_tokenized = 1;
+	lxr_ptr->column_counter_tokenized = 0;
 	lxr_ptr->symbol_counter_read = 0;
 
 	lxr_ptr->file_ptr = file_ptr;
@@ -162,22 +164,38 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			Dfa_get_current_configuration(lxr_ptr->dfa_ptr, &dfa_state, NULL, &dfa_symbol_counter);
 
 			Token* tkn_ptr = Token_new();
-			// TODO assign line number etc
+			tkn_ptr->position = dfa_symbol_counter;
+			tkn_ptr->line = lxr_ptr->line_counter_tokenized;
+			tkn_ptr->column = 1 + lxr_ptr->column_counter_tokenized;
 
 			if(dfa_retract_status == DFA_RETRACT_RESULT_FAIL){
 				// Scanning error in input
+				tkn_ptr->len = 0;
 				lxr_ptr->error_evaluate_function(tkn_ptr);
 			}
 
 			else if(dfa_retract_status == DFA_RETRACT_RESULT_SUCCESS){
 				// Scanning successful
 
-				int len_string = lxr_ptr->symbol_counter_tokenized - dfa_symbol_counter;
+				// Extract the string from buffers
+				int len_string = dfa_symbol_counter - lxr_ptr->symbol_counter_tokenized;
 				char string[len_string];
-
 				buffer_list_get_string(lxr_ptr, string, 1 + lxr_ptr->symbol_counter_tokenized, len_string);
 
+				// Modify the token
+				tkn_ptr->len = len_string;
 				lxr_ptr->success_evaluate_function(tkn_ptr, dfa_state, string, len_string);
+
+				// Calculate number of LF characters in string
+				int num_LF = 0;
+				for (int i = 0; i < len_string; ++i){
+					num_LF += (string[i] == '\n');
+				}
+
+				// Increment lxr_ptr's counters
+				lxr_ptr->symbol_counter_tokenized += len_string;
+				lxr_ptr->line_counter_tokenized += num_LF;
+				lxr_ptr->column_counter_tokenized += len_string;
 			}
 
 			// Return the token after evaluation
