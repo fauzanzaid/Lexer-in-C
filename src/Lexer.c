@@ -8,19 +8,21 @@
 // Data Structures //
 /////////////////////
 
-typedef struct Lexer Lexer;
+typedef struct Lexer{
+
+} Lexer;
 
 
 ////////////////////////////////
 // Constructors & Destructors //
 ////////////////////////////////
 
-Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size{
-	
+Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size){
+
 }
 
-void Lexer_destroy(Lexer *lxr_ptr{
-	
+void Lexer_destroy(Lexer *lxr_ptr){
+
 }
 
 
@@ -28,12 +30,12 @@ void Lexer_destroy(Lexer *lxr_ptr{
 // Evaluator //
 ///////////////
 
-void Lexer_add_state_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int){
-	
+void Lexer_add_state_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int)){
+
 }
 
-void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int){
-	
+void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int)){
+
 }
 
 
@@ -41,6 +43,6 @@ void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_func
 // Tokens //
 ////////////
 
-Token *Lexer_get_next_token(Lexer *lxr_ptr{
-	
+Token *Lexer_get_next_token(Lexer *lxr_ptr){
+
 }
