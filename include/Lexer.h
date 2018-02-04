@@ -55,7 +55,9 @@ void Lexer_add_state_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_functi
 
 /**
  * Add evaluation function which will be called if no specfic function has been
- * assigned to the state
+ * assigned to the state. If not default evaluator is added, and a state
+ * evaluator is not available, the call to @p Lexer_get_next_token() will return
+ * an error
  * @param lxr_ptr           Pointer to struct
  * @param evaluate_function User defined function
  */
@@ -70,9 +72,9 @@ void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_func
  * Reads the input and returns the next token
  * @param  lxr_ptr Pointer to struct
  * @return         A heap allocated token. Must be freed by a call to @p
- * Token_destroy() after using
+ * Token_destroy() after using. Returns NULL in case of an error
  */
-Token *Lexer_get_next_token(Lexer *lxr_ptr)
+Token *Lexer_get_next_token(Lexer *lxr_ptr);
 
 
 #endif
