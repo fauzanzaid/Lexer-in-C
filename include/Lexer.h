@@ -22,12 +22,23 @@ typedef struct Lexer Lexer;
 
 /**
  * Allocates and returns a pointer to a @p Lexer struct
- * @param  dfa_ptr     Pointer to an initialized Dfa, which will do the scanning
- * @param  file_ptr    Pointer to an open FILE suitable for reading
- * @param  buffer_size Number of bytes to read at a time from input
- * @return             Pointer to initialized Lexer
+ * @param  dfa_ptr                   Pointer to an initialized Dfa, which will
+ * do the scanning
+ * @param  file_ptr                  Pointer to an open FILE suitable for
+ * reading
+ * @param  buffer_size               Number of bytes to read at a time from
+ * input
+ * @param  success_evaluate_function User defined function which sets the type
+ * and data of the @p Token passed as a pointer. The state, scanned string and
+ * its length are also passed to the function for evaluation
+ * @param error_evaluate_function    User defined function with a pointer to a
+ * Token passed as a parameter
+ * @return                           Pointer to initialized Lexer
  */
-Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size);
+Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size,
+	void (*success_evaluate_function)(Token *, int, char *, int),
+	void (*error_evaluate_function)(Token *)
+	);
 
 /**
  * Deallocates the struct and all internally allocated memory. The Dfa will not
@@ -35,33 +46,6 @@ Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size);
  * @param lxr_ptr Pointer to struct
  */
 void Lexer_destroy(Lexer *lxr_ptr);
-
-
-///////////////
-// Evaluator //
-///////////////
-
-/**
- * Add evaluation function which will be called on reaching the specified @p
- * state, when no further transitions to a final state with the current scanned
- * string are possible
- * @param lxr_ptr           Pointer to struct
- * @param state             State at which the function will be called
- * @param evaluate_function User defined function which sets the type and data
- * of the @p Token passed as a pointer. The scanned string and its length are
- * also passed to the function for evaluation
- */
-void Lexer_add_state_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int));
-
-/**
- * Add evaluation function which will be called if no specfic function has been
- * assigned to the state. If not default evaluator is added, and a state
- * evaluator is not available, the call to @p Lexer_get_next_token() will return
- * an error
- * @param lxr_ptr           Pointer to struct
- * @param evaluate_function User defined function
- */
-void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int));
 
 
 ////////////

@@ -44,8 +44,8 @@ typedef struct Lexer{
 
 	// Evaluators
 
-	HashTable *evaluator_table;
-	void (*evaluator_default)(Token *, char *, int);
+	void (*success_evaluate_function)(Token *, int, char *, int);
+	void (*error_evaluate_function)(Token *);
 
 } Lexer;
 
@@ -57,10 +57,6 @@ typedef struct Lexer{
 static Buffer *Buffer_new(int size);
 
 static void Buffer_destroy(Buffer *bfr_ptr);
-
-static int hash_function(void *key);
-
-static int key_compare(void *key1, void *key2);
 
 // Adds buffers to buffer_list if character at index does not exist yet. Frees
 // unneeded buffers from buffer_list.
@@ -80,7 +76,10 @@ static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len)
 // Constructors & Destructors //
 ////////////////////////////////
 
-Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size){
+Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size,
+	void (*success_evaluate_function)(Token *, int, char *, int),
+	void (*error_evaluate_function)(Token *)
+	){
 	Lexer *lxr_ptr = malloc( sizeof(Lexer) );
 
 	lxr_ptr->dfa_ptr = dfa_ptr;
@@ -93,7 +92,8 @@ Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size){
 	lxr_ptr->buffer_size = buffer_size;
 	lxr_ptr->buffer_list = LinkedList_new();
 
-	lxr_ptr->evaluator_table = HashTable_new(lxr_ptr->dfa_len_states, hash_function, key_compare);
+	lxr_ptr->success_evaluate_function = success_evaluate_function;
+	lxr_ptr->error_evaluate_function = error_evaluate_function;
 }
 
 void Lexer_destroy(Lexer *lxr_ptr){
@@ -105,7 +105,6 @@ void Lexer_destroy(Lexer *lxr_ptr){
 	}
 
 	LinkedList_destroy(lxr_ptr->buffer_list);
-	HashTable_destroy(lxr_ptr->evaluator_table);
 
 	free(lxr_ptr);
 }
@@ -119,19 +118,6 @@ static Buffer *Buffer_new(int size){
 static void Buffer_destroy(Buffer *bfr_ptr){
 	free(bfr_ptr->string);
 	free(bfr_ptr);
-}
-
-
-///////////////
-// Evaluator //
-///////////////
-
-void Lexer_add_state_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int)){
-	HashTable_add(lxr_ptr->evaluator_table, &state, evaluate_function);
-}
-
-void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int)){
-	lxr_ptr->evaluator_default = evaluate_function;
 }
 
 
@@ -175,13 +161,27 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			int dfa_symbol_counter;
 			Dfa_get_current_configuration(lxr_ptr->dfa_ptr, &dfa_state, NULL, &dfa_symbol_counter);
 
+			Token* tkn_ptr = Token_new();
+			// TODO assign line number etc
+
 			if(dfa_retract_status == DFA_RETRACT_RESULT_FAIL){
-				// Lexical error in input
-			}
-			else if(dfa_retract_status == DFA_RETRACT_RESULT_SUCCESS){
-				// Send string to evaluator
+				// Scanning error in input
+				lxr_ptr->error_evaluate_function(tkn_ptr);
 			}
 
+			else if(dfa_retract_status == DFA_RETRACT_RESULT_SUCCESS){
+				// Scanning successful
+
+				int len_string = lxr_ptr->symbol_counter_tokenized - dfa_symbol_counter;
+				char string[len_string];
+
+				buffer_list_get_string(lxr_ptr, string, 1 + lxr_ptr->symbol_counter_tokenized, len_string);
+
+				lxr_ptr->success_evaluate_function(tkn_ptr, dfa_state, string, len_string);
+			}
+
+			// Return the token after evaluation
+			return tkn_ptr;
 		}
 
 	}
@@ -364,17 +364,4 @@ static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len)
 			}
 		}
 	}
-}
-
-
-///////////
-// Other //
-///////////
-
-int hash_function(void *key){
-	return (*(int *)(key));
-}
-
-int key_compare(void *key1, void *key2){
-	return *(int *)(key1) - *(int *)(key2);
 }
