@@ -101,11 +101,11 @@ static void Buffer_destroy(Buffer *bfr_ptr){
 ///////////////
 
 void Lexer_add_state_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int)){
-
+	HashTable_add(lxr_ptr->evaluator_table, &state, evaluate_function);
 }
 
 void Lexer_add_default_evaluator(Lexer *lxr_ptr, int state, void (*evaluate_function)(Token *, char *, int)){
-
+	lxr_ptr->evaluator_default = evaluate_function;
 }
 
 
