@@ -220,8 +220,7 @@ static int buffer_list_add(Lexer *lxr_ptr){
 			// Add a buffer containing only the EOF constant
 			Buffer *bfr_eof_ptr = Buffer_new( sizeof(char) );
 
-			*(bfr_eof_ptr->string) = (char)EOF;	// Casting int to char.
-				// Works as char is signed, and EOF can fit in char.
+			*(bfr_eof_ptr->string) = 0x04;	// EOT character
 			bfr_eof_ptr->len_string = 1;
 			bfr_ptr->global_index_start = 1 + lxr_ptr->symbol_counter_read;
 			bfr_ptr->global_index_end = bfr_ptr->global_index_start;
