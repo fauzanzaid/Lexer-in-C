@@ -132,6 +132,9 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 	int dfa_run_status = DFA_RUN_RESULT_UNKNOWN;
 	int bfr_update_status;
 
+	// Set to start state, invalidate last final state
+	Dfa_reset_state(dfa_ptr);
+
 	while(1){
 		Buffer *bfr_ptr = LinkedList_peek(lxr_ptr->buffer_list);
 
