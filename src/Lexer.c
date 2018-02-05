@@ -59,10 +59,10 @@ static Buffer *Buffer_new(int size);
 
 static void Buffer_destroy(Buffer *bfr_ptr);
 
-// Adds buffers to buffer_list if character at index does not exist yet. Frees
-// unneeded buffers from buffer_list.
-// Returns 0 on success. -1 on failure
-static int buffer_list_update(Lexer *lxr_ptr, int index);
+// Gets the buffer in which character at index exists. Adds buffers to
+// buffer_list if character at index does not exist yet. Frees unneeded
+// buffers from buffer_list. Returns ptr on success. NULL on failure
+static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index);
 
 // Reads required number of characters from input and adds one buffer to
 // buffer_list
@@ -136,29 +136,27 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 	Dfa_reset_state(lxr_ptr->dfa_ptr);
 
 	while(1){
-		Buffer *bfr_ptr = LinkedList_peek(lxr_ptr->buffer_list);
 
-		if(bfr_ptr != NULL){
-			dfa_run_status = Dfa_run(lxr_ptr->dfa_ptr, bfr_ptr->string, bfr_ptr->len_string, bfr_ptr->global_index_start);
+		// Get how many characters have been processed by DFA
+		int dfa_symbol_counter;
+		Dfa_get_current_configuration(lxr_ptr->dfa_ptr, NULL, NULL, &dfa_symbol_counter);
+
+		// Update buffer list to make sure expected character exists in it and
+		// get the required buffer
+		Buffer *bfr_ptr = buffer_list_get_buffer(lxr_ptr, dfa_symbol_counter + 1);
+
+		if(bfr_ptr == NULL){
+			// Unrecoverable condition
+			fprintf(stderr, "Error updating buffers\n");
+			return NULL;
 		}
 
-		if(bfr_ptr == NULL ||
-			dfa_run_status == DFA_RUN_RESULT_MORE_INPUT ||
-			dfa_run_status == DFA_RUN_RESULT_WRONG_INDEX){
-			// Get how many characters have been processed by DFA
-			int dfa_symbol_counter;
-			Dfa_get_current_configuration(lxr_ptr->dfa_ptr, NULL, NULL, &dfa_symbol_counter);
+		// Run Dfa
+		dfa_run_status = Dfa_run(lxr_ptr->dfa_ptr, bfr_ptr->string, bfr_ptr->len_string, bfr_ptr->global_index_start);
 
-			// Update buffer list to make sure expected character exists in it
-			bfr_update_status = buffer_list_update(lxr_ptr, dfa_symbol_counter + 1);
-			if(bfr_update_status == -1){
-				// Error
-				fprintf(stderr, "Error updating buffers\n");
-				return NULL;
-			}
-		}
+		if(dfa_run_status == DFA_RUN_RESULT_TRAP){
+			// Token (success or error) can be sent
 
-		else if(dfa_run_status == DFA_RUN_RESULT_TRAP){
 			int dfa_retract_status;
 			dfa_retract_status = Dfa_retract(lxr_ptr->dfa_ptr);
 
@@ -215,8 +213,16 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			return tkn_ptr;
 		}
 
-	}
+		else if(dfa_run_status == DFA_RUN_RESULT_WRONG_INDEX){
+			// Unrecoverable condition
+			return NULL;
+		}
 
+		else if(dfa_run_status == DFA_RUN_RESULT_MORE_INPUT){
+			// Dfa requires more input
+			continue;
+		}
+	}
 }
 
 
@@ -224,10 +230,10 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 // Buffer //
 ////////////
 
-static int buffer_list_update(Lexer *lxr_ptr, int index){
+static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index){
 	if(index <= lxr_ptr->symbol_counter_tokenized){
 		// Unrecoverable condition
-		return -1;
+		return NULL;
 	}
 
 	// Pop unneeded buffers
@@ -260,7 +266,7 @@ static int buffer_list_update(Lexer *lxr_ptr, int index){
 			int status = buffer_list_add(lxr_ptr);
 			if(status == -1){
 				// Error while reading
-				return -1;
+				return NULL;
 			}
 		}
 
@@ -274,12 +280,31 @@ static int buffer_list_update(Lexer *lxr_ptr, int index){
 			int status = buffer_list_add(lxr_ptr);
 			if(status == -1){
 				// Error while reading
-				return -1;
+				return NULL;
 			}
 		}
 	}
 
-	return 0;
+	// Search for buffer to return
+	LinkedListIterator *itr_ptr = LinkedListIterator_new(lxr_ptr->buffer_list);
+	while(1){
+		Buffer *bfr_ptr = LinkedListIterator_get_item(itr_ptr);
+
+		if(bfr_ptr == NULL){
+			// Impossible condition
+			LinkedListIterator_destroy(itr_ptr);
+			return NULL;
+		}
+		else if(bfr_ptr->global_index_start <= index && index <= bfr_ptr->global_index_end){
+			// Character at index exists in this buffer
+			LinkedListIterator_destroy(itr_ptr);
+			return bfr_ptr;
+		}
+		else{
+			// Check older buffers
+			LinkedListIterator_move_to_previous(itr_ptr);
+		}
+	}
 }
 
 static int buffer_list_add(Lexer *lxr_ptr){
