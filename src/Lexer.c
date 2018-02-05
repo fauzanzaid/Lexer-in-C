@@ -173,7 +173,9 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			if(dfa_retract_status == DFA_RETRACT_RESULT_FAIL){
 				// Scanning error in input
 				tkn_ptr->len = 0;
-				tkn_ptr->position = dfa_symbol_counter;
+				tkn_ptr->position = dfa_symbol_counter + 1;
+					// Add 1, as the dfa counter will be at the last tokenized
+					// character
 				lxr_ptr->error_evaluate_function(tkn_ptr);
 			}
 
@@ -190,16 +192,23 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 				tkn_ptr->position = dfa_symbol_counter - len_string + 1;
 				lxr_ptr->success_evaluate_function(tkn_ptr, dfa_state, string, len_string);
 
-				// Calculate number of LF characters in string
+				// Calculate number of LF characters in string and set column
+				// counter
 				int num_LF = 0;
 				for (int i = 0; i < len_string; ++i){
-					num_LF += (string[i] == '\n');
+					if(string[i] == '\n'){
+						num_LF += 1;
+						lxr_ptr->column_counter_tokenized = 0;
+					}
+					else{
+						lxr_ptr->column_counter_tokenized++;
+					}
 				}
 
-				// Increment lxr_ptr's counters
+				// Increment lxr_ptr's other counters
 				lxr_ptr->symbol_counter_tokenized += len_string;
 				lxr_ptr->line_counter_tokenized += num_LF;
-				lxr_ptr->column_counter_tokenized += len_string;
+
 			}
 
 			// Return the token after evaluation
