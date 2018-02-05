@@ -133,7 +133,7 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 	int bfr_update_status;
 
 	// Set to start state, invalidate last final state
-	Dfa_reset_state(dfa_ptr);
+	Dfa_reset_state(lxr_ptr->dfa_ptr);
 
 	while(1){
 		Buffer *bfr_ptr = LinkedList_peek(lxr_ptr->buffer_list);
