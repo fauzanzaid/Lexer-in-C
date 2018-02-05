@@ -287,6 +287,7 @@ static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index){
 
 	// Search for buffer to return
 	LinkedListIterator *itr_ptr = LinkedListIterator_new(lxr_ptr->buffer_list);
+	LinkedListIterator_move_to_first(itr_ptr);
 	while(1){
 		Buffer *bfr_ptr = LinkedListIterator_get_item(itr_ptr);
 
@@ -302,7 +303,7 @@ static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index){
 		}
 		else{
 			// Check older buffers
-			LinkedListIterator_move_to_previous(itr_ptr);
+			LinkedListIterator_move_to_next(itr_ptr);
 		}
 	}
 }
