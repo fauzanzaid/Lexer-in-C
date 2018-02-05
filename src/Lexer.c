@@ -359,11 +359,13 @@ static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len)
 
 		if(bfr_ptr == NULL){
 			// Unrecoverable condition
+			LinkedListIterator_destroy(itr_ptr);
 			return -1;
 		}
 
 		else if(bfr_ptr->global_index_start > index + char_copied){
 			// Unrecoverable condition
+			LinkedListIterator_destroy(itr_ptr);
 			return -1;
 		}
 
@@ -400,6 +402,7 @@ static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len)
 				char_copied += num_char_left;
 
 				// return as no more characters need to be copied
+				LinkedListIterator_destroy(itr_ptr);
 				return 0;
 			}
 
