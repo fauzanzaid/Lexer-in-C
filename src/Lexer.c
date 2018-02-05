@@ -167,13 +167,13 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			Dfa_get_current_configuration(lxr_ptr->dfa_ptr, &dfa_state, NULL, &dfa_symbol_counter);
 
 			Token* tkn_ptr = Token_new();
-			tkn_ptr->position = dfa_symbol_counter;
 			tkn_ptr->line = lxr_ptr->line_counter_tokenized;
 			tkn_ptr->column = 1 + lxr_ptr->column_counter_tokenized;
 
 			if(dfa_retract_status == DFA_RETRACT_RESULT_FAIL){
 				// Scanning error in input
 				tkn_ptr->len = 0;
+				tkn_ptr->position = dfa_symbol_counter;
 				lxr_ptr->error_evaluate_function(tkn_ptr);
 			}
 
@@ -187,6 +187,7 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 
 				// Modify the token
 				tkn_ptr->len = len_string;
+				tkn_ptr->position = dfa_symbol_counter - len_string + 1;
 				lxr_ptr->success_evaluate_function(tkn_ptr, dfa_state, string, len_string);
 
 				// Calculate number of LF characters in string
