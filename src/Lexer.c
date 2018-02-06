@@ -231,6 +231,7 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 ////////////
 
 static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index){
+
 	if(index <= lxr_ptr->symbol_counter_tokenized){
 		// Unrecoverable condition
 		return NULL;
@@ -375,8 +376,8 @@ static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len)
 			LinkedListIterator_move_to_previous(itr_ptr);
 		}
 
-		else if(bfr_ptr->global_index_start >= index + char_copied &&
-			bfr_ptr->global_index_end <= index + char_copied)
+		else if(bfr_ptr->global_index_start <= (index + char_copied) &&
+			bfr_ptr->global_index_end >= (index + char_copied))
 		{
 			// Index for copying is within this buffer. Copy
 
