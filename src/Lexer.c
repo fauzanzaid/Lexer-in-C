@@ -215,6 +215,7 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 
 		else if(dfa_run_status == DFA_RUN_RESULT_WRONG_INDEX){
 			// Unrecoverable condition
+			fprintf(stderr, "Error in getting correct index character\n");
 			return NULL;
 		}
 
@@ -260,6 +261,7 @@ static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index){
 	// Add required buffers
 	while(1){
 		// Check the first buffer in list
+
 		Buffer *bfr_ptr = LinkedList_peek(lxr_ptr->buffer_list);
 
 		if(bfr_ptr == NULL){
@@ -273,6 +275,7 @@ static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index){
 
 		else if(bfr_ptr->global_index_end >= index){
 			// Required character in buffer
+
 			break;
 		}
 
@@ -313,27 +316,32 @@ static int buffer_list_add(Lexer *lxr_ptr){
 	Buffer *bfr_ptr = Buffer_new(lxr_ptr->buffer_size);
 
 	bfr_ptr->len_string = fread(bfr_ptr->string, sizeof(char), lxr_ptr->buffer_size, lxr_ptr->file_ptr);
+
 	bfr_ptr->global_index_start = 1 + lxr_ptr->symbol_counter_read;
 	bfr_ptr->global_index_end = bfr_ptr->global_index_start + bfr_ptr->len_string - 1;
 
 	lxr_ptr->symbol_counter_read += bfr_ptr->len_string;
 
-	LinkedList_push(lxr_ptr->buffer_list, bfr_ptr);
+	if(bfr_ptr->len_string != 0){
+		// Only add if some characters have been read
+		LinkedList_push(lxr_ptr->buffer_list, bfr_ptr);
+	}
 
 	if(bfr_ptr->len_string < lxr_ptr->buffer_size){
 		// EOF or error
 
 		if( feof(lxr_ptr->file_ptr) ){
-			// EOF
-			// Add a buffer containing only the EOF constant
-			Buffer *bfr_eof_ptr = Buffer_new( sizeof(char) );
+			// EOF: Add a buffer containing the EOF control character, followed
+			// by \n to trigger fail and retract to EOF state of the DFA
+			Buffer *bfr_eof_ptr = Buffer_new( 2 );
 
-			*(bfr_eof_ptr->string) = 0x04;	// EOT character
-			bfr_eof_ptr->len_string = 1;
-			bfr_ptr->global_index_start = 1 + lxr_ptr->symbol_counter_read;
-			bfr_ptr->global_index_end = bfr_ptr->global_index_start;
+			(bfr_eof_ptr->string)[0] = 0x04;	// EOT character
+			(bfr_eof_ptr->string)[1] = '\n';
+			bfr_eof_ptr->len_string = 2;
+			bfr_eof_ptr->global_index_start = 1 + lxr_ptr->symbol_counter_read;
+			bfr_eof_ptr->global_index_end = 1 + bfr_eof_ptr->global_index_start;
 
-			lxr_ptr->symbol_counter_read += 1;
+			lxr_ptr->symbol_counter_read += 2;
 
 			LinkedList_push(lxr_ptr->buffer_list, bfr_eof_ptr);
 		}
