@@ -315,19 +315,24 @@ static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index){
 static int buffer_list_add(Lexer *lxr_ptr){
 	Buffer *bfr_ptr = Buffer_new(lxr_ptr->buffer_size);
 
-	bfr_ptr->len_string = fread(bfr_ptr->string, sizeof(char), lxr_ptr->buffer_size, lxr_ptr->file_ptr);
+	int char_read = fread(bfr_ptr->string, sizeof(char), lxr_ptr->buffer_size, lxr_ptr->file_ptr);
+	bfr_ptr->len_string = char_read;
 
 	bfr_ptr->global_index_start = 1 + lxr_ptr->symbol_counter_read;
 	bfr_ptr->global_index_end = bfr_ptr->global_index_start + bfr_ptr->len_string - 1;
 
-	lxr_ptr->symbol_counter_read += bfr_ptr->len_string;
+	lxr_ptr->symbol_counter_read += char_read;
 
-	if(bfr_ptr->len_string != 0){
+	if(char_read != 0){
 		// Only add if some characters have been read
 		LinkedList_push(lxr_ptr->buffer_list, bfr_ptr);
 	}
+	else{
+		// Otherwise free buffer
+		Buffer_destroy(bfr_ptr);
+	}
 
-	if(bfr_ptr->len_string < lxr_ptr->buffer_size){
+	if(char_read < lxr_ptr->buffer_size){
 		// EOF or error
 
 		if( feof(lxr_ptr->file_ptr) ){
