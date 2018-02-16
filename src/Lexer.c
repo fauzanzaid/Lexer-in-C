@@ -254,7 +254,7 @@ static Buffer* buffer_list_get_buffer(Lexer *lxr_ptr, int index){
 		}
 
 		else{
-			LinkedList_popback(lxr_ptr->buffer_list);
+			Buffer_destroy( LinkedList_popback(lxr_ptr->buffer_list) );
 		}
 	}
 
