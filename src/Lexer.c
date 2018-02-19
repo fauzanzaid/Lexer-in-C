@@ -7,6 +7,19 @@
 #include "LinkedList.h"
 
 
+///////////////
+// Constants //
+///////////////
+
+#define LEXER_MAX_CHAR 20
+
+#define TEXT_RED	"\x1B[31m"
+#define TEXT_GRN	"\x1B[32m"
+#define TEXT_YLW	"\x1B[33m"
+#define TEXT_BLD	"\x1B[1m"
+#define TEXT_RST	"\x1B[0m"
+
+
 /////////////////////
 // Data Structures //
 /////////////////////
@@ -45,8 +58,8 @@ typedef struct Lexer{
 
 	// Evaluators
 
-	void (*success_evaluate_function)(Token *, int, char *, int);
-	void (*error_evaluate_function)(Token *);
+	char * (*success_evaluate_function)(Token *, int, char *, int);
+	char * (*error_evaluate_function)(Token *, int, char *, int);
 
 } Lexer;
 
@@ -72,14 +85,17 @@ static int buffer_list_add(Lexer *lxr_ptr);
 // into dst. Returns 0 on success, -1 on failure
 static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len);
 
+// Print error message
+static void print_error(Token *tkn_ptr, char *string, int len_string, char *buffer);
+
 
 ////////////////////////////////
 // Constructors & Destructors //
 ////////////////////////////////
 
 Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size,
-	void (*success_evaluate_function)(Token *, int, char *, int),
-	void (*error_evaluate_function)(Token *)
+	char * (*success_evaluate_function)(Token *, int, char *, int),
+	char * (*error_evaluate_function)(Token *, int, char *, int)
 	){
 
 	Lexer *lxr_ptr = malloc( sizeof(Lexer) );
@@ -168,8 +184,12 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			tkn_ptr->line = lxr_ptr->line_counter_tokenized;
 			tkn_ptr->column = 1 + lxr_ptr->column_counter_tokenized;
 
-			// Extract the string from buffers
+			// Get len. If 0 (error), set to 1, so that the error character
+			// can be passed to print_error
 			int len_string = dfa_symbol_counter - lxr_ptr->symbol_counter_tokenized;
+			if(len_string == 0)	len_string = 1;
+
+			// Extract the string from buffers
 			char string[len_string];
 			buffer_list_get_string(lxr_ptr, string, 1 + lxr_ptr->symbol_counter_tokenized, len_string);
 
@@ -179,12 +199,17 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 
 			if(dfa_retract_status == DFA_RETRACT_RESULT_FAIL){
 				// Scanning error in input
-				lxr_ptr->error_evaluate_function(tkn_ptr);
+				char *buffer = lxr_ptr->error_evaluate_function(tkn_ptr, dfa_state, string, len_string);
+				print_error(tkn_ptr, string, len_string, buffer);
 			}
 
 			else if(dfa_retract_status == DFA_RETRACT_RESULT_SUCCESS){
 				// Scanning successful
-				lxr_ptr->success_evaluate_function(tkn_ptr, dfa_state, string, len_string);
+				char *buffer = lxr_ptr->success_evaluate_function(tkn_ptr, dfa_state, string, len_string);
+
+				if(buffer != NULL){
+					print_error(tkn_ptr, string, len_string, buffer);
+				}
 			}
 
 			// Calculate number of LF characters in string and set column
@@ -220,6 +245,32 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			continue;
 		}
 	}
+}
+
+
+static void print_error(Token *tkn_ptr, char *string, int len_string, char *buffer){
+	printf( TEXT_BLD "%d:%d: " TEXT_RST, tkn_ptr->line, tkn_ptr->column);
+	printf( TEXT_BLD TEXT_RED "lexical error: " TEXT_RST);
+
+	if(string != NULL){
+		printf("Got ");
+
+		if(len_string > LEXER_MAX_CHAR){
+			// Truncate string
+			printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "...\"", LEXER_MAX_CHAR, string);
+		}
+		else{
+			// Print as is. String is not null terminated, use len_string
+			printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "\"", len_string, string);
+		}
+		printf(". ");
+	}
+
+	if(buffer != NULL){
+		printf("\"" TEXT_BLD TEXT_GRN "%s" TEXT_RST "\"" , buffer);
+	}
+
+	printf("\n");
 }
 
 

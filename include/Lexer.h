@@ -29,15 +29,19 @@ typedef struct Lexer Lexer;
  * @param  buffer_size               Number of bytes to read at a time from
  * input
  * @param  success_evaluate_function User defined function which sets the type
- * and data of the @p Token passed as a pointer. The state, scanned string and
- * its length are also passed to the function for evaluation
+ * and data of the @p Token passed as a pointer. User is responsible for
+ * allocateing and freeing the data of thr tken. The state, scanned string and
+ * its length are also passed to the function for evaluation. In case of
+ * evaluation failure, the function returns a pointer to a null terminated error
+ * message buffer
  * @param error_evaluate_function    User defined function with a pointer to a
- * Token passed as a parameter
+ * Token passed as a parameter, which performs the same as above function. This
+ * function will be called when the dfa cannot transition on given input
  * @return                           Pointer to initialized Lexer
  */
 Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size,
-	void (*success_evaluate_function)(Token *, int, char *, int),
-	void (*error_evaluate_function)(Token *)
+	char * (*success_evaluate_function)(Token *, int, char *, int),
+	char * (*error_evaluate_function)(Token *, int, char *, int)
 	);
 
 /**
