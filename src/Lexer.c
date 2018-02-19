@@ -184,10 +184,10 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			tkn_ptr->line = lxr_ptr->line_counter_tokenized;
 			tkn_ptr->column = 1 + lxr_ptr->column_counter_tokenized;
 
-			// Get len. If 0 (error), set to 1, so that the error character
-			// can be passed to print_error
+			// Get len. If Error, increment by one so that error character can
+			// be included in string
 			int len_string = dfa_symbol_counter - lxr_ptr->symbol_counter_tokenized;
-			if(len_string == 0)	len_string = 1;
+			if(dfa_retract_status == DFA_RETRACT_RESULT_FAIL)	len_string++;
 
 			// Extract the string from buffers
 			char string[len_string];
