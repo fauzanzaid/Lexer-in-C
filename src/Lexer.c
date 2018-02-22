@@ -49,12 +49,17 @@ typedef struct Lexer{
 	int symbol_counter_read;
 		// Global index of symbol upto which reading is complete
 
+	int flag_errors_found;
+		// Errors have been found while lexing
+	int flag_error_recovery;
+		// Error recovery is active
+
 	// Buffer
 
 	FILE *file_ptr;
 	int buffer_size;
 	LinkedList *buffer_list;
-
+	LinkedList *error_list;
 
 	// Evaluators
 
@@ -62,6 +67,14 @@ typedef struct Lexer{
 	char * (*error_evaluate_function)(Token *, int, char *, int);
 
 } Lexer;
+
+typedef struct ErrorBuffer{
+	int line;
+	int column;
+	char *string;
+	int len_string;
+	char *error;
+} ErrorBuffer;
 
 
 /////////////////////////////////
@@ -85,8 +98,11 @@ static int buffer_list_add(Lexer *lxr_ptr);
 // into dst. Returns 0 on success, -1 on failure
 static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len);
 
-// Print error message
-static void print_error(Token *tkn_ptr, char *string, int len_string, char *buffer);
+static ErrorBuffer *ErrorBuffer_new(Token *tkn_ptr, char *string, int len_string, char *error);
+
+static void ErrorBuffer_destroy(ErrorBuffer *bfr_ptr);
+
+static void add_error(Lexer *lxr_ptr, Token *tkn_ptr, char *string, int len_string, char *error);
 
 
 ////////////////////////////////
@@ -106,9 +122,13 @@ Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size,
 	lxr_ptr->column_counter_tokenized = 0;
 	lxr_ptr->symbol_counter_read = 0;
 
+	lxr_ptr->flag_errors_found = 0;
+	lxr_ptr->flag_error_recovery = 0;
+
 	lxr_ptr->file_ptr = file_ptr;
 	lxr_ptr->buffer_size = buffer_size;
 	lxr_ptr->buffer_list = LinkedList_new();
+	lxr_ptr->error_list = LinkedList_new();
 
 	lxr_ptr->success_evaluate_function = success_evaluate_function;
 	lxr_ptr->error_evaluate_function = error_evaluate_function;
@@ -120,6 +140,13 @@ void Lexer_destroy(Lexer *lxr_ptr){
 		Buffer *bfr_ptr = LinkedList_pop(lxr_ptr->buffer_list);
 		if(bfr_ptr == NULL)	break;
 		else	Buffer_destroy(bfr_ptr);
+	}
+
+	// Free all error buffers
+	while(1){
+		ErrorBuffer *bfr_ptr = LinkedList_pop(lxr_ptr->error_list);
+		if(bfr_ptr == NULL)	break;
+		else	ErrorBuffer_destroy(bfr_ptr);
 	}
 
 	LinkedList_destroy(lxr_ptr->buffer_list);
@@ -134,6 +161,24 @@ static Buffer *Buffer_new(int size){
 }
 
 static void Buffer_destroy(Buffer *bfr_ptr){
+	free(bfr_ptr->string);
+	free(bfr_ptr);
+}
+
+static ErrorBuffer *ErrorBuffer_new(Token *tkn_ptr, char *string, int len_string, char *error){
+	ErrorBuffer *bfr_ptr = malloc( sizeof(ErrorBuffer) );
+
+	bfr_ptr->line = tkn_ptr->line;
+	bfr_ptr->column = tkn_ptr->column;
+
+	bfr_ptr->string = malloc( sizeof(char) * len_string );
+	strncpy(bfr_ptr->string, string, len_string);
+
+	bfr_ptr->len_string = len_string;
+	bfr_ptr->error = error;
+}
+
+static void ErrorBuffer_destroy(ErrorBuffer *bfr_ptr){
 	free(bfr_ptr->string);
 	free(bfr_ptr);
 }
@@ -199,8 +244,17 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 
 			if(dfa_retract_status == DFA_RETRACT_RESULT_FAIL){
 				// Scanning error in input
-				char *buffer = lxr_ptr->error_evaluate_function(tkn_ptr, dfa_state, string, len_string);
-				print_error(tkn_ptr, string, len_string, buffer);
+				lxr_ptr->flag_errors_found = 1;
+
+				if(lxr_ptr->flag_error_recovery == 1){
+					// Error recovery already active, no need to record additional error
+				}
+				else{
+					// Enable error recovery, record error
+					char *error = lxr_ptr->error_evaluate_function(tkn_ptr, dfa_state, string, len_string);
+					add_error(lxr_ptr, tkn_ptr, string, len_string, error);
+				}
+
 
 				// Skip invalid character index
 				Dfa_skip(lxr_ptr->dfa_ptr);
@@ -208,10 +262,16 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 
 			else if(dfa_retract_status == DFA_RETRACT_RESULT_SUCCESS){
 				// Scanning successful
-				char *buffer = lxr_ptr->success_evaluate_function(tkn_ptr, dfa_state, string, len_string);
 
-				if(buffer != NULL){
-					print_error(tkn_ptr, string, len_string, buffer);
+				// Disable error recovery
+				lxr_ptr->flag_error_recovery = 0;
+
+				// Check for other errors
+				char *error = lxr_ptr->success_evaluate_function(tkn_ptr, dfa_state, string, len_string);
+
+				if(error != NULL){
+					lxr_ptr->flag_errors_found = 1;
+					add_error(lxr_ptr, tkn_ptr, string, len_string, error);
 				}
 			}
 
@@ -248,32 +308,6 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 			continue;
 		}
 	}
-}
-
-
-static void print_error(Token *tkn_ptr, char *string, int len_string, char *buffer){
-	printf( TEXT_BLD "%d:%d: " TEXT_RST, tkn_ptr->line, tkn_ptr->column);
-	printf( TEXT_BLD TEXT_RED "lexical error: " TEXT_RST);
-
-	if(string != NULL){
-		printf("Got ");
-
-		if(len_string > LEXER_MAX_CHAR){
-			// Truncate string
-			printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "...\"", LEXER_MAX_CHAR, string);
-		}
-		else{
-			// Print as is. String is not null terminated, use len_string
-			printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "\"", len_string, string);
-		}
-		printf(". ");
-	}
-
-	if(buffer != NULL){
-		printf(TEXT_BLD TEXT_GRN "%s" TEXT_RST, buffer);
-	}
-
-	printf("\n");
 }
 
 
@@ -488,4 +522,51 @@ static int buffer_list_get_string(Lexer *lxr_ptr, char *dst, int index, int len)
 			}
 		}
 	}
+}
+
+
+////////////
+// Errors //
+////////////
+
+void Lexer_print_errors(Lexer *lxr_ptr){
+	LinkedListIterator *itr_ptr = LinkedListIterator_new(lxr_ptr->error_list);
+	LinkedListIterator_move_to_first(itr_ptr);
+
+	ErrorBuffer *err_ptr = LinkedListIterator_get_item(itr_ptr);
+	while(err_ptr){
+
+		printf( TEXT_BLD "%d:%d: " TEXT_RST, err_ptr->line, err_ptr->column);
+		printf( TEXT_BLD TEXT_RED "lexical error: " TEXT_RST);
+
+		if(err_ptr->string != NULL){
+			printf("Got ");
+
+			if(err_ptr->len_string > LEXER_MAX_CHAR){
+				// Truncate string
+				printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "...\"", LEXER_MAX_CHAR, err_ptr->string);
+			}
+			else{
+				// Print as is. String is not null terminated, use len_string
+				printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "\"", err_ptr->len_string, err_ptr->string);
+			}
+			printf(". ");
+		}
+
+		if(err_ptr->error != NULL){
+			printf(TEXT_BLD TEXT_GRN "%s" TEXT_RST, err_ptr->error);
+		}
+
+		printf("\n");
+
+		LinkedListIterator_move_to_next(itr_ptr);
+		err_ptr = LinkedListIterator_get_item(itr_ptr);
+	}
+
+	LinkedListIterator_destroy(itr_ptr);
+}
+
+static void add_error(Lexer *lxr_ptr, Token *tkn_ptr, char *string, int len_string, char *error){
+	ErrorBuffer *bfr_ptr = ErrorBuffer_new(tkn_ptr, string, len_string, error);
+	LinkedList_pushback(lxr_ptr->error_list, bfr_ptr);
 }

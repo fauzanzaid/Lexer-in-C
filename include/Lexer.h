@@ -65,4 +65,15 @@ void Lexer_destroy(Lexer *lxr_ptr);
 Token *Lexer_get_next_token(Lexer *lxr_ptr);
 
 
+////////////
+// Errors //
+////////////
+
+/**
+ * Prints information about each error encountered so far
+ * @param lxr_ptr Pointer to Lexer struct
+ */
+void Lexer_print_errors(Lexer *lxr_ptr);
+
+
 #endif
