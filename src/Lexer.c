@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "Lexer.h"
 #include "Dfa.h"
@@ -173,6 +174,11 @@ static ErrorBuffer *ErrorBuffer_new(Token *tkn_ptr, char *string, int len_string
 
 	bfr_ptr->string = malloc( sizeof(char) * len_string );
 	strncpy(bfr_ptr->string, string, len_string);
+
+	// Replace non printable chars with space
+	for (int i = 0; i < len_string; ++i)
+		if( !isprint(bfr_ptr->string[i]) )
+			bfr_ptr->string[i] = ' ';
 
 	bfr_ptr->len_string = len_string;
 	bfr_ptr->error = error;
