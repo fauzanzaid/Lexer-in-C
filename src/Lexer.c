@@ -201,6 +201,9 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr){
 				// Scanning error in input
 				char *buffer = lxr_ptr->error_evaluate_function(tkn_ptr, dfa_state, string, len_string);
 				print_error(tkn_ptr, string, len_string, buffer);
+
+				// Skip invalid character index
+				Dfa_skip(lxr_ptr->dfa_ptr);
 			}
 
 			else if(dfa_retract_status == DFA_RETRACT_RESULT_SUCCESS){
@@ -267,7 +270,7 @@ static void print_error(Token *tkn_ptr, char *string, int len_string, char *buff
 	}
 
 	if(buffer != NULL){
-		printf("\"" TEXT_BLD TEXT_GRN "%s" TEXT_RST "\"" , buffer);
+		printf(TEXT_BLD TEXT_GRN "%s" TEXT_RST, buffer);
 	}
 
 	printf("\n");
