@@ -142,6 +142,7 @@ void Lexer_destroy(Lexer *lxr_ptr){
 		if(bfr_ptr == NULL)	break;
 		else	Buffer_destroy(bfr_ptr);
 	}
+	LinkedList_destroy(lxr_ptr->buffer_list);
 
 	// Free all error buffers
 	while(1){
@@ -149,8 +150,7 @@ void Lexer_destroy(Lexer *lxr_ptr){
 		if(bfr_ptr == NULL)	break;
 		else	ErrorBuffer_destroy(bfr_ptr);
 	}
-
-	LinkedList_destroy(lxr_ptr->buffer_list);
+	LinkedList_destroy(lxr_ptr->error_list);
 
 	free(lxr_ptr);
 }
