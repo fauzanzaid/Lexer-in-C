@@ -105,6 +105,8 @@ static void ErrorBuffer_destroy(ErrorBuffer *bfr_ptr);
 
 static void add_error(Lexer *lxr_ptr, Token *tkn_ptr, char *string, int len_string, char *error);
 
+static void print_error(ErrorBuffer *err_ptr);
+
 
 ////////////////////////////////
 // Constructors & Destructors //
@@ -541,30 +543,7 @@ void Lexer_print_errors(Lexer *lxr_ptr){
 
 	ErrorBuffer *err_ptr = LinkedListIterator_get_item(itr_ptr);
 	while(err_ptr){
-
-		printf( TEXT_BLD "%d:%d: " TEXT_RST, err_ptr->line, err_ptr->column);
-		printf( TEXT_BLD TEXT_RED "lexical error: " TEXT_RST);
-
-		if(err_ptr->string != NULL){
-			printf("Got ");
-
-			if(err_ptr->len_string > LEXER_MAX_CHAR){
-				// Truncate string
-				printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "...\"", LEXER_MAX_CHAR, err_ptr->string);
-			}
-			else{
-				// Print as is. String is not null terminated, use len_string
-				printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "\"", err_ptr->len_string, err_ptr->string);
-			}
-			printf(". ");
-		}
-
-		if(err_ptr->error != NULL){
-			printf(TEXT_BLD TEXT_GRN "%s" TEXT_RST, err_ptr->error);
-		}
-
-		printf("\n");
-
+		print_error(err_ptr);
 		LinkedListIterator_move_to_next(itr_ptr);
 		err_ptr = LinkedListIterator_get_item(itr_ptr);
 	}
@@ -573,6 +552,32 @@ void Lexer_print_errors(Lexer *lxr_ptr){
 }
 
 static void add_error(Lexer *lxr_ptr, Token *tkn_ptr, char *string, int len_string, char *error){
-	ErrorBuffer *bfr_ptr = ErrorBuffer_new(tkn_ptr, string, len_string, error);
-	LinkedList_pushback(lxr_ptr->error_list, bfr_ptr);
+	ErrorBuffer *err_ptr = ErrorBuffer_new(tkn_ptr, string, len_string, error);
+	print_error(err_ptr);
+	LinkedList_pushback(lxr_ptr->error_list, err_ptr);
+}
+
+static void print_error(ErrorBuffer *err_ptr){
+	printf( TEXT_BLD "%d:%d: " TEXT_RST, err_ptr->line, err_ptr->column);
+	printf( TEXT_BLD TEXT_RED "lexical error: " TEXT_RST);
+
+	if(err_ptr->string != NULL){
+		printf("Got ");
+
+		if(err_ptr->len_string > LEXER_MAX_CHAR){
+			// Truncate string
+			printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "...\"", LEXER_MAX_CHAR, err_ptr->string);
+		}
+		else{
+			// Print as is. String is not null terminated, use len_string
+			printf("\"" TEXT_BLD TEXT_YLW "" "%.*s" TEXT_RST "\"", err_ptr->len_string, err_ptr->string);
+		}
+		printf(". ");
+	}
+
+	if(err_ptr->error != NULL){
+		printf(TEXT_BLD TEXT_GRN "%s" TEXT_RST, err_ptr->error);
+	}
+
+	printf("\n");
 }
