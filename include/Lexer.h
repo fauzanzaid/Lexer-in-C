@@ -75,5 +75,13 @@ Token *Lexer_get_next_token(Lexer *lxr_ptr);
  */
 void Lexer_print_errors(Lexer *lxr_ptr);
 
+/**
+ * Set if lexical errors should be immediately printed on stdout as soon as they
+ * are detected
+ * @param lxr_ptr Pointer to Lexer struct
+ * @param val     0 to not print, non zero to print
+ */
+void Lexer_set_immediate_print_error(Lexer *lxr_ptr, int val);
+
 
 #endif

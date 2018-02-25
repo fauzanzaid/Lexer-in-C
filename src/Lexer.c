@@ -54,6 +54,8 @@ typedef struct Lexer{
 		// Errors have been found while lexing
 	int flag_error_recovery;
 		// Error recovery is active
+	int flag_immediate_print_error;
+		// Print error as soon as it is encountered
 
 	// Buffer
 
@@ -127,6 +129,7 @@ Lexer *Lexer_new(Dfa* dfa_ptr, FILE* file_ptr, int buffer_size,
 
 	lxr_ptr->flag_errors_found = 0;
 	lxr_ptr->flag_error_recovery = 0;
+	lxr_ptr->flag_immediate_print_error = 0;
 
 	lxr_ptr->file_ptr = file_ptr;
 	lxr_ptr->buffer_size = buffer_size;
@@ -551,9 +554,16 @@ void Lexer_print_errors(Lexer *lxr_ptr){
 	LinkedListIterator_destroy(itr_ptr);
 }
 
+void Lexer_set_immediate_print_error(Lexer *lxr_ptr, int val){
+	lxr_ptr->flag_immediate_print_error = val;
+}
+
 static void add_error(Lexer *lxr_ptr, Token *tkn_ptr, char *string, int len_string, char *error){
 	ErrorBuffer *err_ptr = ErrorBuffer_new(tkn_ptr, string, len_string, error);
-	print_error(err_ptr);
+
+	if(lxr_ptr->flag_immediate_print_error)
+		print_error(err_ptr);
+
 	LinkedList_pushback(lxr_ptr->error_list, err_ptr);
 }
 
