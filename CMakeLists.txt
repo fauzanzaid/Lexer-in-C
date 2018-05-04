@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project( Lexer VERSION 0.1.1 )
+project( Lexer VERSION 0.1.0 )
 
 add_library(Lexer STATIC src/Lexer.c)
 
